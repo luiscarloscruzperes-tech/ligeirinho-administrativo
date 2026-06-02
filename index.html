@@ -589,8 +589,7 @@ function hfile(file){
     try{
       var rows=[];
       if(ext==="csv"){
-        var lines=ev.target.result.split("
-").filter(function(l){return l.trim();});
+        var lines=ev.target.result.split("\n").filter(function(l){return l.trim();});
         var sep=lines[0].indexOf(";")>-1?";":",";
         rows=lines.map(function(l){var v=[],c="",q=false;for(var i=0;i<l.length;i++){var ch=l[i];if(ch==='"')q=!q;else if(ch===sep&&!q){v.push(c.trim().replace(/^"|"$/g,""));c="";}else c+=ch;}v.push(c.trim().replace(/^"|"$/g,""));return v;});
       } else {
