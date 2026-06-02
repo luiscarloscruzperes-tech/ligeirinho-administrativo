@@ -274,14 +274,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 var SUPA_URL = "https://pczikalowadubkuoyevz.supabase.co";
-var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjemlrYWxvd2FkdWJrdW95ZXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MDY4MjcsImV4cCI6MjA5NTk4MjgyN30.50e-caRqTzsOv0Ff8vVq3TB60ZusysfYgX-ivHA1XC0";
+var SUPA_KEY = "sb_publishable_poL0ci1c2_4a2bd-LR3bCg_BvEuXXRK";
 var LOJAS = ["LITORAL SUL","CIBRATEL","CUBATAO","TROPICAL","OASIS 2","OASIS 1","BELAS ARTES","CENTRO","ANCHIETA"];
 var FLABELS = {pix:"Pix/Transf.",boleto:"Boleto",cheque:"Cheque",dinheiro:"Dinheiro",debito:"Debito auto",cartao:"Cartao"};
 var movs = [];
 
 // SUPABASE API
 function sbHeaders() {
-  return {"Content-Type":"application/json","apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY};
+  return {
+    "Content-Type": "application/json",
+    "apikey": SUPA_KEY,
+    "Authorization": "Bearer " + SUPA_KEY,
+    "X-Client-Info": "ligeirinho-financeiro"
+  };
 }
 async function sbGet(table, params) {
   var url = SUPA_URL + "/rest/v1/" + table + "?order=created_at.desc&limit=2000";
@@ -356,34 +361,24 @@ document.getElementById("data-ate").value = hoje();
 // INIT — Criar tabelas se nao existirem e carregar dados
 async function init() {
   showLoading(true);
+  var timeout = setTimeout(function(){
+    showLoading(false);
+    renderDash();
+    toast("Banco nao respondeu. Verifique a conexao.", "err");
+  }, 8000);
   try {
-    // Testar conexao
-    var test = await fetch(SUPA_URL + "/rest/v1/movimentos?limit=1", {headers: sbHeaders()});
-    if (test.status === 404 || test.status === 400) {
-      // Tabela nao existe — criar via SQL
-      await criarTabelas();
-    }
     await carregarDados();
+    clearTimeout(timeout);
+    showLoading(false);
+    renderDash();
   } catch(e) {
-    // Tentar criar tabelas
-    try {
-      await criarTabelas();
-      await carregarDados();
-    } catch(e2) {
-      toast("Erro ao conectar ao banco. Verifique a configuracao.", "err");
-    }
+    clearTimeout(timeout);
+    showLoading(false);
+    movs = [];
+    renderDash();
+    var el = document.getElementById("d-alertas");
+    if(el) el.innerHTML = "<div class='alert alert-red'><i class='ti ti-alert-circle'></i><div><strong>Erro ao conectar ao banco:</strong><br>" + e.message + "<br><span style='font-size:11px'>Verifique as politicas de acesso no Supabase.</span></div></div>";
   }
-  showLoading(false);
-  renderDash();
-}
-
-async function criarTabelas() {
-  var sql = "CREATE TABLE IF NOT EXISTS movimentos (id text PRIMARY KEY, tipo text NOT NULL, cat text, forma text, desc_ text, valor numeric NOT NULL, venc date NOT NULL, loja text, cod text, obs text, status text DEFAULT 'pendente', recorr text, qtd integer DEFAULT 0, created_at timestamptz DEFAULT now());";
-  var r = await fetch(SUPA_URL + "/rest/v1/rpc/exec_sql", {
-    method: "POST",
-    headers: sbHeaders(),
-    body: JSON.stringify({sql: sql})
-  });
 }
 
 async function carregarDados() {
