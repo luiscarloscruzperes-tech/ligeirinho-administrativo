@@ -358,38 +358,26 @@ document.getElementById("dt-hoje").textContent = new Date().toLocaleDateString("
 document.getElementById("data-de").value = hoje();
 document.getElementById("data-ate").value = hoje();
 
-// INIT — Criar tabelas se nao existirem e carregar dados
-async function init() {
-  showLoading(true);
-  var timeout = setTimeout(function(){
-    showLoading(false);
-    renderDash();
-    toast("Banco nao respondeu. Verifique a conexao.", "err");
-  }, 8000);
-  try {
-    await carregarDados();
-    clearTimeout(timeout);
-    showLoading(false);
-    renderDash();
-  } catch(e) {
-    clearTimeout(timeout);
-    showLoading(false);
-    movs = [];
-    renderDash();
-    var el = document.getElementById("d-alertas");
-    if(el) el.innerHTML = "<div class='alert alert-red'><i class='ti ti-alert-circle'></i><div><strong>Erro ao conectar ao banco:</strong><br>" + e.message + "<br><span style='font-size:11px'>Verifique as politicas de acesso no Supabase.</span></div></div>";
-  }
-}
+// FALLBACKS GLOBAIS — garantem que o loading SEMPRE some
+window.onerror = function(){ showLoading(false); return false; };
+window.addEventListener('unhandledrejection', function(){ showLoading(false); });
+setTimeout(function(){ showLoading(false); renderDash(); }, 6000); // failsafe absoluto
 
 async function carregarDados() {
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, 5000);
   try {
-    var data = await sbGet("movimentos");
-    movs = data.map(function(r) {
+    var url = SUPA_URL + "/rest/v1/movimentos?order=created_at.desc&limit=2000";
+    var r = await fetch(url, {headers: sbHeaders(), signal: controller.signal});
+    clearTimeout(timer);
+    if (!r.ok) { movs = []; return; }
+    var data = await r.json();
+    movs = (Array.isArray(data) ? data : []).map(function(row) {
       return {
-        id: r.id, tipo: r.tipo, cat: r.cat, forma: r.forma,
-        desc: r.desc_, valor: parseFloat(r.valor), venc: r.venc,
-        loja: r.loja, cod: r.cod, obs: r.obs, status: r.status,
-        recorr: r.recorr, qtd: r.qtd || 0
+        id: row.id, tipo: row.tipo, cat: row.cat, forma: row.forma,
+        desc: row.desc_, valor: parseFloat(row.valor) || 0, venc: row.venc,
+        loja: row.loja, cod: row.cod, obs: row.obs, status: row.status,
+        recorr: row.recorr, qtd: row.qtd || 0
       };
     });
     if (movs.length > 0) {
@@ -397,8 +385,16 @@ async function carregarDados() {
       if (ultERP.length) document.getElementById("dt-erp").textContent = "Ultimo ERP: " + ultERP[0].venc;
     }
   } catch(e) {
+    clearTimeout(timer);
     movs = [];
   }
+}
+
+async function init() {
+  showLoading(true);
+  await carregarDados();
+  showLoading(false);
+  renderDash();
 }
 
 async function salvarMov(mov) {
