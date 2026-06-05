@@ -375,6 +375,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;ba
             <tr><td>CATEGORIA</td><td><span class="badge b-sec">Nao</span></td><td>Ver lista no modelo</td><td>Fornecedor de Gas</td></tr>
             <tr><td>FORMA_PAGAMENTO</td><td><span class="badge b-sec">Nao</span></td><td>pix / boleto / dinheiro / debito / cheque / cartao</td><td>pix</td></tr>
             <tr><td>LOJA</td><td><span class="badge b-sec">Nao</span></td><td>Nome da loja ou GRUPO</td><td>LITORAL SUL</td></tr>
+            <tr><td><strong>RECORRENCIA</strong></td><td><span class="badge b-sec">Nao</span></td><td><strong>unica</strong> (padrao) ou <strong>mensal</strong> (lanca para os proximos 6 meses)</td><td>mensal</td></tr>
+            <tr><td><strong>CODIGO_PIX</strong></td><td><span class="badge b-sec">Nao</span></td><td>Chave Pix ou codigo de barras do boleto</td><td>11.222.333/0001-44</td></tr>
             <tr><td>OBSERVACOES</td><td><span class="badge b-sec">Nao</span></td><td>Texto livre</td><td>NF 4521</td></tr>
           </tbody>
         </table>
@@ -846,17 +848,17 @@ function baixarModelo(){
   var sep=";";
   var linhas=[
     // Cabecalho com instrucoes na linha 1
-    ["DESCRICAO","VALOR","VENCIMENTO","CATEGORIA","FORMA_PAGAMENTO","LOJA","OBSERVACOES"].join(sep),
+    ["DESCRICAO","VALOR","VENCIMENTO","CATEGORIA","FORMA_PAGAMENTO","LOJA","RECORRENCIA","CODIGO_PIX","OBSERVACOES"].join(sep),
     // Linha de instrucoes (linha 2 — nao importada)
-    ["* Obrigatorio","* Obrigatorio (use virgula: 1800,00)","* Obrigatorio (DD/MM/AAAA)","Opcional (ver lista abaixo)","Opcional: pix / boleto / dinheiro / debito / cheque / cartao","Opcional: LITORAL SUL / CIBRATEL / CUBATAO / TROPICAL / OASIS 2 / OASIS 1 / BELAS ARTES / CENTRO / ANCHIETA / GRUPO","Opcional: NF numero etc"].join(sep),
+    ["* Obrigatorio","* Obrigatorio (use virgula: 1800,00)","* Obrigatorio (DD/MM/AAAA)","Opcional (ver lista abaixo)","Opcional: pix / boleto / dinheiro / debito / cheque / cartao","Opcional: LITORAL SUL / CIBRATEL / CUBATAO / TROPICAL / OASIS 2 / OASIS 1 / BELAS ARTES / CENTRO / ANCHIETA / GRUPO","Opcional: unica (padrao) ou mensal (repete 6 meses)","Opcional: chave pix ou codigo de barras do boleto","Opcional: NF numero etc"].join(sep),
     // Exemplos reais
-    ["Ultragaz Julho","5800,00","10/07/2026","Fornecedor de Gas","boleto","LITORAL SUL","NF 4521"].join(sep),
-    ["Consigaz Junho","1800,00","03/07/2026","Fornecedor de Gas","boleto","CIBRATEL","NF 892"].join(sep),
-    ["Salarios Julho","12000,00","05/07/2026","Folha de Pagamento","pix","GRUPO",""].join(sep),
-    ["Aluguel CIBRATEL","2200,00","01/07/2026","Aluguel e Fixas","debito","CIBRATEL",""].join(sep),
-    ["Contabilidade","800,00","10/07/2026","Contabilidade","pix","GRUPO",""].join(sep),
-    ["IPVA Frota","1200,00","15/07/2026","Impostos e Taxas","boleto","GRUPO","3 veiculos"].join(sep),
-    ["Gasolina Entregadores","600,00","20/07/2026","Gasolina / Combustivel","dinheiro","TROPICAL",""].join(sep),
+    ["Ultragaz Julho","5800,00","10/07/2026","Fornecedor de Gas","boleto","LITORAL SUL","unica","34191.09008 00000.000000 00000.000001 1 00000000058000","NF 4521"].join(sep),
+    ["Consigaz Junho","1800,00","03/07/2026","Fornecedor de Gas","boleto","CIBRATEL","unica","34191.09008 00000.000000 00000.000002 1 00000000018000","NF 892"].join(sep),
+    ["Salarios Julho","12000,00","05/07/2026","Folha de Pagamento","pix","GRUPO","unica","",""].join(sep),
+    ["Aluguel CIBRATEL","2200,00","01/07/2026","Aluguel e Fixas","debito","CIBRATEL","mensal","","Contrato anual"].join(sep),
+    ["Contabilidade","800,00","10/07/2026","Contabilidade","pix","GRUPO","mensal","11.222.333/0001-44",""].join(sep),
+    ["IPVA Frota","1200,00","15/07/2026","Impostos e Taxas","boleto","GRUPO","unica","","3 veiculos"].join(sep),
+    ["Gasolina Entregadores","600,00","20/07/2026","Gasolina / Combustivel","dinheiro","TROPICAL","unica","",""].join(sep),
   ];
   var csv="﻿"+linhas.join("\n"); // BOM UTF-8 para Excel abrir corretamente
   var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
@@ -891,6 +893,8 @@ function hfileImp(file){
       var iCat=hdrs.findIndex(function(h){return h.includes("categ")});
       var iFrm=hdrs.findIndex(function(h){return h.includes("forma")||h.includes("pagam")});
       var iLj=hdrs.findIndex(function(h){return h.includes("loja")||h.includes("unid")});
+      var iRec=hdrs.findIndex(function(h){return h.includes("recorr")});
+      var iCod=hdrs.findIndex(function(h){return h.includes("codigo")||h.includes("pix")||h.includes("barras")});
       var iObs=hdrs.findIndex(function(h){return h.includes("obs")||h.includes("nota")});
       if(iDesc<0||iVal<0||iVenc<0){el.innerHTML="<div class='alert alert-amber'>Colunas nao encontradas. Verifique se usou o modelo correto (linha 1 = cabecalho).</div>";return;}
 
@@ -909,12 +913,15 @@ function hfileImp(file){
         if(!desc||isNaN(val)||val<=0||!venc){erros.push(i+1);continue;}
         // normalizar data DD/MM/YYYY → YYYY-MM-DD
         if(venc.includes("/")){var p=venc.split("/");if(p.length===3)venc=(p[2].length===2?"20"+p[2]:p[2])+"-"+p[1].padStart(2,"0")+"-"+p[0].padStart(2,"0");}
+        var recVal=iRec>=0?String(row[iRec]||"").toLowerCase().trim():"unica";
         preview.push({
           desc:desc,valor:val,venc:venc,
           cat:iCat>=0?String(row[iCat]||"Outros"):"Outros",
-          forma:iFrm>=0?String(row[iFrm]||""):"",
-          loja:iLj>=0?String(row[iLj]||"GRUPO"):"GRUPO",
-          obs:iObs>=0?String(row[iObs]||""):""
+          forma:iFrm>=0?String(row[iFrm]||"").toLowerCase().trim():"",
+          loja:iLj>=0?String(row[iLj]||"GRUPO").toUpperCase().trim():"GRUPO",
+          recorr:(recVal==="mensal"?"mensal":"unica"),
+          cod:iCod>=0?String(row[iCod]||"").trim():"",
+          obs:iObs>=0?String(row[iObs]||"").trim():""
         });
       }
 
@@ -926,12 +933,15 @@ function hfileImp(file){
       html+="</div>";
       html+="<button class='btn-main' style='width:auto;margin:0' onclick='salvarImportacao()'><i class='ti ti-upload'></i> Confirmar e Salvar "+preview.length+" contas</button></div>";
 
-      html+="<div style='overflow-x:auto'><table class='imp-table'><thead><tr><th>#</th><th>Descricao</th><th>Valor</th><th>Vencimento</th><th>Categoria</th><th>Forma</th><th>Loja</th></tr></thead><tbody>";
+      // contar quantas parcelas serao geradas no total
+      var totalLancamentos=preview.reduce(function(a,r){return a+(r.recorr==="mensal"?6:1);},0);
+      html+="<div style='overflow-x:auto'><table class='imp-table'><thead><tr><th>#</th><th>Descricao</th><th>Valor</th><th>Vencimento</th><th>Categoria</th><th>Forma</th><th>Loja</th><th>Recorrencia</th><th>Codigo Pix/Boleto</th></tr></thead><tbody>";
       preview.slice(0,20).forEach(function(r,i){
-        html+="<tr><td>"+(i+1)+"</td><td style='max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+r.desc+"</td><td>"+fmt(r.valor)+"</td><td>"+new Date(r.venc+"T12:00:00").toLocaleDateString("pt-BR")+"</td><td>"+r.cat+"</td><td>"+(FLABELS[r.forma]||r.forma||"—")+"</td><td>"+r.loja+"</td></tr>";
+        html+="<tr><td>"+(i+1)+"</td><td style='max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+r.desc+"</td><td>"+fmt(r.valor)+"</td><td>"+new Date(r.venc+"T12:00:00").toLocaleDateString("pt-BR")+"</td><td>"+r.cat+"</td><td>"+(FLABELS[r.forma]||r.forma||"—")+"</td><td>"+r.loja+"</td><td>"+(r.recorr==="mensal"?"<span class='badge b-pend'>Mensal 6x</span>":"<span class='badge b-sec'>Unica</span>")+"</td><td style='max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:10px'>"+(r.cod||"—")+"</td></tr>";
       });
-      if(preview.length>20)html+="<tr><td colspan='7' style='text-align:center;color:var(--g400);font-style:italic'>... e mais "+(preview.length-20)+" contas</td></tr>";
+      if(preview.length>20)html+="<tr><td colspan='9' style='text-align:center;color:var(--g400);font-style:italic'>... e mais "+(preview.length-20)+" linhas</td></tr>";
       html+="</tbody></table></div>";
+      if(totalLancamentos!==preview.length)html+="<div class='alert alert-amber' style='margin-top:10px'><i class='ti ti-info-circle'></i> Contas com <strong>Mensal 6x</strong> gerarao automaticamente os proximos 6 meses. Total de lancamentos que serao criados: <strong>"+totalLancamentos+"</strong>.</div>";
 
       el.innerHTML=html;
       el._preview=preview;
@@ -945,11 +955,29 @@ async function salvarImportacao(){
   if(!el._preview||!el._preview.length){toast("Nenhum dado para salvar.","err");return;}
   showLoading(true);
   try{
-    var batch=el._preview.map(function(r,i){return{id:String(Date.now()+i),tipo:"pagar",cat:r.cat,forma:r.forma,desc_:r.desc,valor:r.valor,venc:r.venc,loja:r.loja,cod:"",obs:r.obs,status:"pendente",recorr:"unica",qtd:0};});
+    var batch=[];
+    var ts=Date.now();
+    el._preview.forEach(function(r,i){
+      var base={id:String(ts+i*100),tipo:"pagar",cat:r.cat,forma:r.forma,desc_:r.desc,valor:r.valor,venc:r.venc,loja:r.loja,cod:r.cod||"",obs:r.obs||"",status:"pendente",recorr:r.recorr,qtd:0};
+      batch.push(base);
+      // Se mensal, gera mais 5 meses (total 6)
+      if(r.recorr==="mensal"){
+        for(var m=1;m<=5;m++){
+          var dt=new Date(r.venc+"T12:00:00");dt.setMonth(dt.getMonth()+m);
+          var nb=JSON.parse(JSON.stringify(base));
+          nb.id=String(ts+i*100+m);
+          nb.venc=dt.toISOString().split("T")[0];
+          nb.cod=""; // codigo de barras nao se repete
+          batch.push(nb);
+        }
+      }
+    });
     await sbUpsert("movimentos",batch,"id");
-    batch.forEach(function(row){movs.push({id:row.id,tipo:row.tipo,cat:row.cat,forma:row.forma,desc:row.desc_,valor:row.valor,venc:row.venc,loja:row.loja,cod:"",obs:row.obs,status:row.status,recorr:row.recorr,qtd:0});});
-    toast(el._preview.length+" contas importadas!","ok");
-    el.innerHTML="<div class='alert alert-green'><i class='ti ti-check'></i> <strong>"+el._preview.length+" contas salvas com sucesso!</strong> Acesse o Dashboard para conferir.</div>";
+    batch.forEach(function(row){movs.push({id:row.id,tipo:row.tipo,cat:row.cat,forma:row.forma,desc:row.desc_,valor:row.valor,venc:row.venc,loja:row.loja,cod:row.cod,obs:row.obs,status:row.status,recorr:row.recorr,qtd:0});});
+    var mens=el._preview.filter(function(r){return r.recorr==="mensal";}).length;
+    var msg=el._preview.length+" contas importadas"+(mens>0?", sendo "+mens+" com recorrencia mensal ("+batch.length+" lancamentos no total)":"")+"!";
+    toast(msg,"ok");
+    el.innerHTML="<div class='alert alert-green'><i class='ti ti-check'></i> <strong>"+batch.length+" lancamentos salvos com sucesso!</strong>"+(mens>0?" ("+mens+" conta(s) com 6 meses de recorrencia)":"")+" Acesse o Dashboard para conferir.</div>";
     el._preview=null;
     renderDash();
   }catch(e){toast("Erro ao salvar: "+e.message,"err");}
