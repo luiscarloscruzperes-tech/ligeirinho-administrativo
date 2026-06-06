@@ -860,6 +860,45 @@ async function marcarRec(id,btn){
 }
 
 // ============================================================
+// ============================================================
+// PARSER DE DATA ROBUSTO — aceita todos formatos do Excel
+// ============================================================
+function parseDataExcel(raw){
+  if(raw===null||raw===undefined||raw==="")return"";
+  var s=String(raw).trim().split(" ")[0]; // remove hora
+  // YYYY-MM-DD (ja correto)
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  // DD/MM/YYYY ou DD/MM/YY (padrao Brasil)
+  if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)){
+    var p=s.split("/");
+    var a=p[2].length===2?"20"+p[2]:p[2];
+    return a+"-"+p[1].padStart(2,"0")+"-"+p[0].padStart(2,"0");
+  }
+  // DD-MM-YYYY com tracinho
+  if(/^\d{1,2}-\d{1,2}-\d{2,4}$/.test(s)){
+    var p=s.split("-");
+    if(parseInt(p[0])<=31&&parseInt(p[1])<=12){
+      var a=p[2].length===2?"20"+p[2]:p[2];
+      return a+"-"+p[1].padStart(2,"0")+"-"+p[0].padStart(2,"0");
+    }
+  }
+  // Numero serial do Excel (ex: 46283 = 10/07/2026)
+  // Excel conta dias desde 01/01/1900; Unix epoch = serial 25569
+  var num=parseFloat(s);
+  if(!isNaN(num)&&s.length<=6&&num>36526&&num<80000){
+    var d=new Date(Math.round((num-25569)*86400*1000));
+    // Ajusta fuso horario para nao virar o dia
+    d=new Date(d.getTime()+d.getTimezoneOffset()*60000);
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  }
+  // Texto ISO com T (ex: "2026-07-10T00:00:00")
+  if(raw&&String(raw).includes("T")){
+    try{var d=new Date(raw);if(!isNaN(d.getTime()))return d.toISOString().split("T")[0];}catch(e){}
+  }
+  return"";
+}
+
+// ============================================================
 // IMPORTAR CONTAS A PAGAR VIA PLANILHA
 // ============================================================
 function baixarModelo(){
@@ -927,11 +966,9 @@ function hfileImp(file){
         var desc=String(row[iDesc]||"").trim();
         var valStr=String(row[iVal]||"").replace(/[R$\s]/g,"").replace(",",".");
         var val=parseFloat(valStr);
-        var venc=String(row[iVenc]||"").trim().split(" ")[0];
+        var venc=parseDataExcel(row[iVenc]);
         if(!desc&&!venc)continue;
         if(!desc||isNaN(val)||val<=0||!venc){erros.push(i+1);continue;}
-        // normalizar data DD/MM/YYYY → YYYY-MM-DD
-        if(venc.includes("/")){var p=venc.split("/");if(p.length===3)venc=(p[2].length===2?"20"+p[2]:p[2])+"-"+p[1].padStart(2,"0")+"-"+p[0].padStart(2,"0");}
         var recVal=iRec>=0?String(row[iRec]||"").toLowerCase().trim():"unica";
         preview.push({
           desc:desc,valor:val,venc:venc,
